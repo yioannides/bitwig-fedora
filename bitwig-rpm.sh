@@ -5,7 +5,7 @@ function get_download_url()
 {
 	if [ $# -eq 0 ]; then
 		echo "Determining latest stable version..." 1>&2
-		RELATIVE_URL=$(curl --silent -L bitwig.com | grep -Eo 'dl[^"]*installer_linux')
+		RELATIVE_URL=$(curl --silent -L bitwig.com/download/ | grep -Eo 'dl[^"]*installer_linux')
 	else
 		echo "Finding version $1..." 1>&2
 		RELATIVE_URL=dl/Bitwig%20Studio/$1/installer_linux
