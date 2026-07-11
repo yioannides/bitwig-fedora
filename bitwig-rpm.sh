@@ -49,6 +49,15 @@ function download_bitwig()
 	echo $TARGET_PATH/$FILENAME
 }
 
+function rpm_basename()
+{
+	base=$(basename -s .deb $DEBIAN_PKG)
+	fedora_release=$(cut -d ' ' -f 3 /etc/redhat-release)
+	arch=$(uname -m)
+
+	echo $base-1.fc$fedora_release.$arch.rpm
+}
+
 function check_if_already_built()
 {
 	rpm=$(rpm_basename)
