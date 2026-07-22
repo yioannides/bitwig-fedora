@@ -133,12 +133,12 @@ function build_rpm()
 	echo $(basename $RPM_FILE)
 }
 
-if [ $# -eq 0 ]; then
-	DEBIAN_PKG=$(download_bitwig)
-elif [[ $1 =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
-	DEBIAN_PKG=$(download_bitwig $1)
-else
+if [[ $1 =~ ".deb" ]]; then
 	DEBIAN_PKG=$1
+elif [ $# -eq 0 ]; then
+	DEBIAN_PKG=$(download_bitwig)
+elif [ "$1" == "--beta" ] || [[ $1 =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
+	DEBIAN_PKG=$(download_bitwig "$1")
 fi
 
 check_if_already_built $DEBIAN_PKG
