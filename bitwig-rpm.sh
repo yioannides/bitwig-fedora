@@ -1,11 +1,27 @@
-#!/bin/bash
+#!/usr/bin/env bash
 SPEC=bitwig-studio.spec
 
 function get_download_url()
 {
 	if [ $# -eq 0 ]; then
 		echo "Determining latest stable version..." 1>&2
-		RELATIVE_URL=$(curl --silent -L bitwig.com/download/ | grep -Eo 'dl[^"]*installer_linux')
+		RELATIVE_URL=$(curl --silent -L bitwig.com/download/ | grep -Eo 'dl/Bitwig%20Studio/[0-9]+\.[0-9]+(\.[0-9]+)?/installer_linux' | head -n1)
+	elif [ "$1" == "--beta" ]; then
+		echo "Determining latest beta line..." 1>&2
+		STABLE=$(curl --silent -L bitwig.com/download/ | grep -Eo 'dl/Bitwig%20Studio/[0-9]+\.[0-9]+(\.[0-9]+)?/installer_linux' | head -n1 | grep -Eo '[0-9]+\.[0-9]+')
+		MAJOR=$(echo "$STABLE" | cut -d. -f1)
+		MINOR=$(echo "$STABLE" | cut -d. -f2)
+
+		while curl -s -o /dev/null -L --head -w '%{http_code}' "https://www.bitwig.com/dl/Bitwig%20Studio/${MAJOR}.$((MINOR+1))%20Beta%201/installer_linux" | grep -q 200; do
+			MINOR=$((MINOR+1))
+		done
+
+		echo "Determining latest beta version..." 1>&2
+		N=1
+		while curl -s -o /dev/null -L --head -w '%{http_code}' "https://www.bitwig.com/dl/Bitwig%20Studio/${MAJOR}.${MINOR}%20Beta%20$((POINT+1))/installer_linux" | grep -q 200; do
+			POINT=$((POINT+1))
+		done
+		RELATIVE_URL="dl/Bitwig%20Studio/${MAJOR}.${MINOR}%20Beta%20${POINT}/installer_linux"
 	else
 		echo "Finding version $1..." 1>&2
 		RELATIVE_URL=dl/Bitwig%20Studio/$1/installer_linux
@@ -24,8 +40,9 @@ function download_bitwig()
 
 	TARGET_PATH=rpmbuild/SOURCES
 	FILENAME=$(basename $(echo $DOWNLOAD_URL | sed 's/?.*//'))
-
-	echo "Downloading $(echo $DOWNLOAD_URL | sed 's/?.*//')" 1>&2
+	VERSION=$(echo "$DOWNLOAD_URL" | grep -oP 'bitwig-studio-\K.*(?=\.deb)')
+	
+	echo -e "Downloading \e[1mBitwig Studio $(echo "${VERSION}\e[0m...\n${DOWNLOAD_URL}" | sed 's/?.*//')" 1>&2
 	curl --create-dirs --output-dir $TARGET_PATH \
 		--remote-name -C - $DOWNLOAD_URL
 
