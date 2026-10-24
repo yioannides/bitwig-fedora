@@ -6,13 +6,15 @@ BLUE="\e[34m"
 BLUE_BG="\e[48;5;20m\e[38;5;255m\e[1m"
 ESC_END="\e[0m"
 
+STATIC_LINK="https://www.bitwig.com/dl/Bitwig%20Studio"
+
 sudo -v
 while sleep 60; do sudo -n true; done &
 trap 'kill $!' EXIT
 
 tput clear
 echo -e "${BLUE_BG} BITWIG-FEDORA ${ESC_END}"
-echo -e "${BOLD}by teervo & yioannides${ESC_END}\n"
+echo -e "${BOLD}by yioannides & teervo${ESC_END}\n"
 sleep 1
 
 check_dependencies()
@@ -26,53 +28,80 @@ check_dependencies()
 	fi
 }
 
-get_download_url()
+pull_versions()
 {
-	if [ $# -eq 0 ]; then
-		echo "Determining latest stable version..." 1>&2
-		RELATIVE_URL=$(curl --silent -L bitwig.com/download/ | grep -Eo 'dl/Bitwig%20Studio/[0-9]+\.[0-9]+(\.[0-9]+)?/installer_linux' | head -n1)
-	elif [ "$1" == "--beta" ]; then
-		echo "Determining latest beta line..." 1>&2
-		STABLE=$(curl --silent -L bitwig.com/download/ | grep -Eo 'dl/Bitwig%20Studio/[0-9]+\.[0-9]+(\.[0-9]+)?/installer_linux' | head -n1 | grep -Eo '[0-9]+\.[0-9]+')
-		MAJOR=$(echo "$STABLE" | cut -d. -f1)
-		MINOR=$(echo "$STABLE" | cut -d. -f2)
+    echo "Gathering available packages..." >&2
+    curl --silent --location https://bitwig.com/download/ |
+        grep -Eo 'dl/Bitwig%20Studio/[0-9]+\.[0-9]+(\.[0-9]+)?/installer_linux' |
+        head -n1 |
+        grep -Eo '[0-9]+\.[0-9]+(\.[0-9]+)?'
+}
 
-		while curl -s -o /dev/null -L --head -w '%{http_code}' "https://www.bitwig.com/dl/Bitwig%20Studio/${MAJOR}.$((MINOR+1))%20Beta%201/installer_linux" | grep -q 200; do
-			MINOR=$((MINOR+1))
-		done
+url_exists()
+{
+    [[ $(curl --silent --output /dev/null --location --head \
+        --write-out '%{http_code}' "$1") == 200 ]]
+}
 
-		echo "Determining latest beta version..." 1>&2
-		POINT=1
-		while curl -s -o /dev/null -L --head -w '%{http_code}' "https://www.bitwig.com/dl/Bitwig%20Studio/${MAJOR}.${MINOR}%20Beta%20$((POINT+1))/installer_linux" | grep -q 200; do
-			POINT=$((POINT+1))
-		done
-		RELATIVE_URL="dl/Bitwig%20Studio/${MAJOR}.${MINOR}%20Beta%20${POINT}/installer_linux"
-	else
-		echo "Finding version $1..." 1>&2
-		RELATIVE_URL=dl/Bitwig%20Studio/$1/installer_linux
-	fi
-	FULL_URL=https://www.bitwig.com/$RELATIVE_URL
+get_download_url()
+{	
+    local STABLE MAJOR MINOR POINT
+    STABLE=$(pull_versions)
+    IFS=. read -r MAJOR MINOR POINT <<< "$STABLE"
+	
+	case "$1" in
+		"")
+			echo "Determining latest stable version..." 1>&2
+			RELATIVE_URL="$STABLE/installer_linux"
+			;;
+			
+		-b | --beta)
+			echo "Determining latest beta line..." 1>&2
+			while url_exists "$STATIC_LINK/${MAJOR}.$((MINOR+1))%20Beta%201/installer_linux"; do
+				MINOR=$((MINOR+1))
+			done
+
+			echo "Determining latest beta version..." 1>&2
+			POINT=1
+			while url_exists "$STATIC_LINK/${MAJOR}.${MINOR}%20Beta%20$((POINT+1))/installer_linux"; do
+				POINT=$((POINT+1))
+			done
+			RELATIVE_URL="${MAJOR}.${MINOR}%20Beta%20${POINT}/installer_linux"
+			;;
+			
+		-p | --pre-release)
+			echo "Determining latest pre-release version..." 1>&2
+			while url_exists "$STATIC_LINK/${MAJOR}.${MINOR}.$((POINT+1))/installer_linux"; do
+				POINT=$((POINT+1))
+			done
+			RELATIVE_URL="${MAJOR}.${MINOR}.${POINT}/installer_linux"
+			;;
+		*)
+			echo "Finding version $1..." 1>&2
+			RELATIVE_URL=$1/installer_linux	
+			;;
+	esac
+
+	FULL_URL=$STATIC_LINK/$RELATIVE_URL
 	curl -L --head -w '%{url_effective}' $FULL_URL 2>/dev/null | tail -n1
 }
 
+
 download_bitwig()
 {
-	if [ $# -eq 0 ]; then
-		DOWNLOAD_URL=$(get_download_url)
-	else
-		DOWNLOAD_URL=$(get_download_url $1)
-	fi
+    local DOWNLOAD_URL TARGET_PATH FILENAME VERSION CLEAN_URL
 
-	TARGET_PATH=rpmbuild/SOURCES
-	FILENAME=$(basename $(echo $DOWNLOAD_URL | sed 's/?.*//'))
-	VERSION=$(echo "$DOWNLOAD_URL" | grep -oP 'bitwig-studio-\K.*(?=\.deb)')
-	
-	echo
-	echo -e "\nDownloading ${BOLD}Bitwig Studio $(echo "${VERSION}${ESC_END}...\n${DOWNLOAD_URL}" | sed 's/?.*//')" 1>&2
-	curl --create-dirs --output-dir $TARGET_PATH \
-		--remote-name -C - $DOWNLOAD_URL
+    DOWNLOAD_URL=$(get_download_url "$@") || return 1
+    TARGET_PATH=rpmbuild/SOURCES
+    CLEAN_URL=$(sed 's/?.*//' <<< "$DOWNLOAD_URL")
+    FILENAME=$(basename "$CLEAN_URL")
+    VERSION=$(grep -oP 'bitwig-studio-\K.*(?=\.deb)' <<< "$DOWNLOAD_URL")
 
-	echo $TARGET_PATH/$FILENAME
+    echo
+    echo -e "\nDownloading ${BOLD}Bitwig Studio ${VERSION}${ESC_END}...\n${CLEAN_URL}" >&2
+    curl --create-dirs --output-dir "$TARGET_PATH" \
+        --remote-name -C - "$DOWNLOAD_URL" || return 1
+    echo "$TARGET_PATH/$FILENAME"
 }
 
 rpm_basename()
@@ -181,13 +210,28 @@ install_rpm()
 	echo -e "\n${BOLD}Installation complete! ${ESC_END}\n" 1>&2
 }
 
-if [[ $1 =~ ".deb" ]]; then
-	DEBIAN_PKG=$1
-elif [ $# -eq 0 ]; then
-	DEBIAN_PKG=$(download_bitwig)
-elif [ "$1" == "--beta" ] || [[ $1 =~ [0-9]+\.[0-9]+\.[0-9]+ ]]; then
-	DEBIAN_PKG=$(download_bitwig "$1")
-fi
+case "$1" in
+    *.deb)
+        DEBIAN_PKG=$1
+        ;;
+    "")
+        DEBIAN_PKG=$(download_bitwig)
+        ;;
+    -b | --beta | -p | --pre-release)
+        DEBIAN_PKG=$(download_bitwig "$1")
+        ;;
+    *)
+        if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            DEBIAN_PKG=$(download_bitwig "$1")
+        else
+        		echo -e "${BOLD}ERROR: Unknown input${ESC_END}"
+        		echo "Please refer to the README for instructions:"
+        		echo "https://github.com/yioannides/bitwig-fedora#optional-arguments"
+        		echo
+        		exit 2
+        fi
+        ;;
+esac
 
 check_dependencies
 check_if_already_built $DEBIAN_PKG
