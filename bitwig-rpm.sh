@@ -212,20 +212,20 @@ install_rpm()
 
 case "$1" in
     *.deb)
-    	request_sudo
+		request_sudo
         DEBIAN_PKG=$1
         ;;
     "")
-    	request_sudo
+		request_sudo
         DEBIAN_PKG=$(download_bitwig)
         ;;
     -b | --beta | -p | --pre-release)
-    	request_sudo
+		request_sudo
         DEBIAN_PKG=$(download_bitwig "$1")
         ;;
     *)
         if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        	request_sudo
+			request_sudo
             DEBIAN_PKG=$(download_bitwig "$1")
         else
         		echo -e "\n${BOLD}ERROR: Unknown input${ESC_END}"
