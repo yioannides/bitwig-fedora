@@ -8,7 +8,7 @@ ESC_END="\e[0m"
 
 STATIC_LINK="https://www.bitwig.com/dl/Bitwig%20Studio"
 
-ask_sudo()
+request_sudo()
 {
 	tput clear
 	echo -e "${BLUE_BG} BITWIG-FEDORA ${ESC_END}"
@@ -212,20 +212,20 @@ install_rpm()
 
 case "$1" in
     *.deb)
-    	ask_sudo
+    	request_sudo
         DEBIAN_PKG=$1
         ;;
     "")
-    	ask_sudo
+    	request_sudo
         DEBIAN_PKG=$(download_bitwig)
         ;;
     -b | --beta | -p | --pre-release)
-    	ask_sudo
+    	request_sudo
         DEBIAN_PKG=$(download_bitwig "$1")
         ;;
     *)
         if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        	ask_sudo
+        	request_sudo
             DEBIAN_PKG=$(download_bitwig "$1")
         else
         		echo -e "\n${BOLD}ERROR: Unknown input${ESC_END}"
