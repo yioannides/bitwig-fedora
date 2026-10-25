@@ -29,7 +29,7 @@ Both installation methods accept additional arguments at the end, for example:
 | (example) `5.1.3` | an older / specific version |
 | `/path/to/local/bitwig-studio.deb` | your locally stored `.deb` file |
 
-<sup>* if available
+<sup>* when available
 
 #### aliases:
 
