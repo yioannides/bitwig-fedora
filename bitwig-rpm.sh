@@ -8,14 +8,16 @@ ESC_END="\e[0m"
 
 STATIC_LINK="https://www.bitwig.com/dl/Bitwig%20Studio"
 
-sudo -v
-while sleep 60; do sudo -n true; done &
-trap 'kill $!' EXIT
-
-tput clear
-echo -e "${BLUE_BG} BITWIG-FEDORA ${ESC_END}"
-echo -e "${BOLD}by yioannides & teervo${ESC_END}\n"
-sleep 1
+ask_sudo()
+{
+	tput clear
+	echo -e "${BLUE_BG} BITWIG-FEDORA ${ESC_END}"
+	echo -e "${BOLD}by teervo & yioannides${ESC_END}\n"
+	sleep 0.5
+	sudo -v
+	while sleep 60; do sudo -n true; done &
+	trap 'kill $!' EXIT
+}
 
 check_dependencies()
 {
@@ -54,7 +56,6 @@ get_download_url()
 			echo "Determining latest stable version..." 1>&2
 			RELATIVE_URL="$STABLE/installer_linux"
 			;;
-			
 		-b | --beta)
 			echo "Determining latest beta line..." 1>&2
 			while url_exists "$STATIC_LINK/${MAJOR}.$((MINOR+1))%20Beta%201/installer_linux"; do
@@ -68,7 +69,6 @@ get_download_url()
 			done
 			RELATIVE_URL="${MAJOR}.${MINOR}%20Beta%20${POINT}/installer_linux"
 			;;
-			
 		-p | --pre-release)
 			echo "Determining latest pre-release version..." 1>&2
 			while url_exists "$STATIC_LINK/${MAJOR}.${MINOR}.$((POINT+1))/installer_linux"; do
@@ -212,19 +212,23 @@ install_rpm()
 
 case "$1" in
     *.deb)
+    	ask_sudo
         DEBIAN_PKG=$1
         ;;
     "")
+    	ask_sudo
         DEBIAN_PKG=$(download_bitwig)
         ;;
     -b | --beta | -p | --pre-release)
+    	ask_sudo
         DEBIAN_PKG=$(download_bitwig "$1")
         ;;
     *)
         if [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        	ask_sudo
             DEBIAN_PKG=$(download_bitwig "$1")
         else
-        		echo -e "${BOLD}ERROR: Unknown input${ESC_END}"
+        		echo -e "\n${BOLD}ERROR: Unknown input${ESC_END}"
         		echo "Please refer to the README for instructions:"
         		echo "https://github.com/yioannides/bitwig-fedora#optional-arguments"
         		echo
